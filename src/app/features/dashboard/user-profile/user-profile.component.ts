@@ -1,8 +1,8 @@
 import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { auth, db } from '../../../core/firebase.config'; // CORRECTION PATH
+import { auth, db } from '../../../core/firebase.config'; // CORRECT: 3 niveaux
 import { collection, query, where, onSnapshot, Unsubscribe, updateDoc, doc } from 'firebase/firestore';
-import { UserService, WorkerProfile } from '../../../core/services/user.service'; // CORRECTION PATH
+import { UserService, WorkerProfile } from '../../../core/services/user.service'; // CORRECT: 3 niveaux
 
 interface Proposal {
   workerId: string;
@@ -60,7 +60,7 @@ interface Job {
                 </div>
               </div>
 
-              <!-- SECTION PROPOSITIONS (Si statut 'analyzing') -->
+              <!-- SECTION PROPOSITIONS -->
               @if (job.status === 'analyzing' && job.proposals && job.proposals.length > 0) {
                 <div class="border-t border-gray-100 pt-3">
                   <h5 class="text-sm font-bold text-gray-700 mb-3 flex items-center">
@@ -85,7 +85,6 @@ interface Job {
                 </div>
               }
               
-              <!-- Feedback si attente -->
               @if (job.status === 'analyzing' && (!job.proposals || job.proposals.length === 0)) {
                 <div class="bg-yellow-50 text-yellow-800 text-xs p-2 rounded text-center">
                   En attente de propositions d'artisans...
@@ -159,9 +158,9 @@ export class UserProfileComponent implements OnInit, OnDestroy {
     });
   }
 
-  // Affiche la modale
   viewWorkerProfile(workerId: string) {
-    this.userService.getWorkerProfile(workerId).subscribe(profile => {
+    // Typage explicite pour éviter l'erreur TS7006/TS2571
+    this.userService.getWorkerProfile(workerId).subscribe((profile: WorkerProfile) => {
       this.selectedWorker = profile;
       this.cdr.detectChanges();
     });
@@ -189,7 +188,6 @@ export class UserProfileComponent implements OnInit, OnDestroy {
     }
   }
 
-  // --- Helpers ---
   getMainMedia(job: Job): string {
     if (job.imageUrls && job.imageUrls.length > 0) return job.imageUrls[0];
     return job.imageUrl || '';

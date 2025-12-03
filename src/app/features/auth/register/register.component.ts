@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '../../../core/firebase.config';
+import { auth } from '../../../core/firebase.config'; // CORRECT: 3 niveaux
 
 @Component({
   selector: 'app-register',
@@ -33,14 +33,12 @@ export class RegisterComponent {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, this.email, this.password);
       
-      // Mise à jour du nom d'affichage (optionnel mais recommandé)
       if (this.fullName) {
         await updateProfile(userCredential.user, {
           displayName: this.fullName
         });
       }
 
-      // Redirection vers la sélection de rôle pour les nouveaux utilisateurs
       this.router.navigate(['/role-select']);
     } catch (error: any) {
       console.error('Registration error', error);

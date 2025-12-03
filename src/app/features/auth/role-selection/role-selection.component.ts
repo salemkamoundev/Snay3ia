@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { auth, db } from '../../../core/firebase.config';
 import { doc, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 @Component({
   selector: 'app-role-selection',
@@ -49,13 +50,23 @@ export class RoleSelectionComponent {
   isLoading = false;
 
   async selectRole(role: 'client' | 'worker') {
-    const user = auth.currentUser;
+    this.isLoading = true;
+
+    // ATTENTE ASYNCHRONE DE L'UTILISATEUR (Fix Refresh)
+    // On n'utilise pas auth.currentUser directement car il peut être null au chargement
+    const user = await new Promise<any>((resolve) => {
+      const unsub = onAuthStateChanged(auth, (u) => {
+        unsub();
+        resolve(u);
+      });
+    });
+
     if (!user) {
+      this.isLoading = false;
+      alert("Erreur : Session expirée. Veuillez vous reconnecter.");
       this.router.navigate(['/login']);
       return;
     }
-
-    this.isLoading = true;
 
     try {
       await setDoc(doc(db, 'users', user.uid), {
@@ -66,7 +77,6 @@ export class RoleSelectionComponent {
         ...(role === 'worker' ? { specialty: 'Général', rating: 5, completedJobs: 0 } : {})
       }, { merge: true });
 
-      // Redirection immédiate vers la bonne section
       const targetRoute = role === 'worker' ? '/dashboard/missions' : '/dashboard/client';
       this.router.navigate([targetRoute]);
       
