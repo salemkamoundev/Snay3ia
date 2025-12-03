@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { auth, db } from '../../../core/firebase.config'; // CHEMIN CORRIGÉ
+import { auth, db } from '../../../core/firebase.config';
 import { doc, setDoc } from 'firebase/firestore';
 
 @Component({
@@ -20,7 +20,6 @@ import { doc, setDoc } from 'firebase/firestore';
         </div>
       } @else {
         <div class="grid gap-6 w-full max-w-md animate-fade-in">
-          <!-- Option Client -->
           <button (click)="selectRole('client')" class="bg-white text-blue-900 p-6 rounded-2xl shadow-xl hover:scale-105 transition transform flex items-center gap-4 group">
             <div class="bg-blue-100 p-4 rounded-full group-hover:bg-blue-200 transition">
               <span class="text-3xl">🏠</span>
@@ -31,7 +30,6 @@ import { doc, setDoc } from 'firebase/firestore';
             </div>
           </button>
 
-          <!-- Option Artisan -->
           <button (click)="selectRole('worker')" class="bg-white text-green-900 p-6 rounded-2xl shadow-xl hover:scale-105 transition transform flex items-center gap-4 group">
             <div class="bg-green-100 p-4 rounded-full group-hover:bg-green-200 transition">
               <span class="text-3xl">🛠️</span>
@@ -53,7 +51,6 @@ export class RoleSelectionComponent {
   async selectRole(role: 'client' | 'worker') {
     const user = auth.currentUser;
     if (!user) {
-      alert("Erreur : Utilisateur non connecté.");
       this.router.navigate(['/login']);
       return;
     }
@@ -61,24 +58,20 @@ export class RoleSelectionComponent {
     this.isLoading = true;
 
     try {
-      // Enregistrement dans Firestore : users/{uid}
       await setDoc(doc(db, 'users', user.uid), {
         email: user.email,
         displayName: user.displayName || '',
         role: role,
         createdAt: new Date(),
-        // Champs spécifiques selon le rôle
         ...(role === 'worker' ? { specialty: 'Général', rating: 5, completedJobs: 0 } : {})
       }, { merge: true });
 
-      console.log(`Rôle ${role} enregistré pour ${user.uid}`);
-      
-      // Redirection vers le dashboard
-      this.router.navigate(['/dashboard']);
+      // Redirection immédiate vers la bonne section
+      const targetRoute = role === 'worker' ? '/dashboard/missions' : '/dashboard/client';
+      this.router.navigate([targetRoute]);
       
     } catch (error) {
       console.error("Erreur sauvegarde rôle:", error);
-      alert("Impossible d'enregistrer le profil. Vérifiez votre connexion.");
       this.isLoading = false;
     }
   }

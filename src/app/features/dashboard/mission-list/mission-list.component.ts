@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { auth, db } from '../../../core/firebase.config'; // CORRECTION PATH
+import { auth, db } from '../../../core/firebase.config';
 import { collection, query, where, onSnapshot, updateDoc, doc, arrayUnion, Unsubscribe } from 'firebase/firestore';
 
 interface Job {
@@ -24,33 +24,18 @@ interface Job {
       <div class="bg-green-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
         <div class="relative z-10">
           <h3 class="text-2xl font-bold">Missions</h3>
-          <p class="opacity-90 text-green-100">Postulez aux chantiers disponibles</p>
+          <p class="opacity-90 text-green-100">Proposez vos services aux clients.</p>
         </div>
         <div class="absolute right-[-20px] top-[-20px] w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
       </div>
 
-      <!-- MESSAGE D'ERREUR (DEBUG) -->
-      @if (errorMessage) {
-        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-md" role="alert">
-          <p class="font-bold">Erreur de chargement</p>
-          <p>{{ errorMessage }}</p>
-          <p class="text-xs mt-2">Vérifiez vos règles Firestore dans la console Firebase.</p>
-        </div>
-      }
-
-      @if (isLoading) {
-        <div class="flex justify-center py-10">
-          <div class="animate-spin h-8 w-8 border-4 border-green-500 border-t-transparent rounded-full"></div>
-        </div>
-      }
-
-      @if (!isLoading && !errorMessage && jobs.length > 0) {
+      @if (!isLoading && jobs.length > 0) {
         <div class="space-y-4">
           @for (job of jobs; track job.id) {
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               
-              <!-- Galerie -->
-              <div class="h-48 w-full bg-black flex overflow-x-auto snap-x no-scrollbar">
+              <!-- Galerie Photo/Vidéo -->
+              <div class="h-64 w-full bg-black flex overflow-x-auto snap-x no-scrollbar">
                 @if (getAllMedia(job).length > 0) {
                   @for (media of getAllMedia(job); track media) {
                     <div class="w-full h-full flex-shrink-0 snap-center relative flex items-center justify-center bg-gray-900">
@@ -70,21 +55,26 @@ interface Job {
                 <div class="flex justify-between mb-2">
                    <span class="text-xs font-bold text-gray-500">{{ formatTimestamp(job.createdAt) | date:'dd MMM HH:mm' }}</span>
                    <span class="text-xs bg-blue-100 text-blue-800 px-2 rounded-full font-bold">
-                     {{ job.proposals?.length || 0 }} candidature(s)
+                     {{ job.proposals?.length || 0 }} devis envoyés
                    </span>
                 </div>
-                <p class="text-gray-800 text-sm mb-4">{{ job.description }}</p>
+                
+                <h4 class="font-bold text-gray-800 mb-1">Description du problème :</h4>
+                <p class="text-gray-600 text-sm mb-4 bg-gray-50 p-3 rounded-lg">{{ job.description }}</p>
                 
                 @if (hasApplied(job)) {
-                  <button disabled class="w-full py-3 bg-gray-300 text-gray-600 font-bold rounded-lg cursor-not-allowed">
-                    Déjà postulé ✅
-                  </button>
+                  <div class="bg-green-50 text-green-700 p-3 rounded-lg text-center font-bold text-sm border border-green-200">
+                    ✅ Vous avez envoyé une proposition
+                  </div>
                 } @else {
-                  <div class="bg-gray-50 p-3 rounded-lg border border-gray-200 mb-3">
-                    <label class="text-xs font-bold text-gray-500 block mb-1">Votre offre (TND)</label>
+                  <div class="border-t border-gray-100 pt-4">
+                    <label class="text-xs font-bold text-gray-500 block mb-2">Envoyer un devis estimatif :</label>
                     <div class="flex gap-2">
-                      <input type="number" [(ngModel)]="offerPrice[job.id]" placeholder="Prix" class="w-1/2 p-2 rounded border border-gray-300 text-sm">
-                      <button (click)="applyToJob(job)" class="w-1/2 py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 text-sm">
+                      <div class="relative flex-grow">
+                        <input type="number" [(ngModel)]="offerPrice[job.id]" placeholder="0" class="w-full pl-3 pr-8 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 outline-none transition">
+                        <span class="absolute right-3 top-2 text-gray-400 text-sm">TND</span>
+                      </div>
+                      <button (click)="applyToJob(job)" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 shadow-sm transition">
                         Envoyer
                       </button>
                     </div>
@@ -94,10 +84,10 @@ interface Job {
             </div>
           }
         </div>
-      } @else if (!isLoading && !errorMessage) {
+      } @else if (!isLoading) {
         <div class="text-center py-10 text-gray-500">
           <div class="text-4xl mb-2">📭</div>
-          Aucune mission disponible avec le statut "En cours".
+          Aucune mission disponible pour le moment.
         </div>
       }
     </div>
@@ -106,7 +96,6 @@ interface Job {
 export class MissionListComponent implements OnInit, OnDestroy {
   jobs: Job[] = [];
   isLoading = true;
-  errorMessage = ''; // Pour afficher les erreurs de permission
   offerPrice: { [key: string]: number } = {};
   
   private unsubscribe: Unsubscribe | null = null;
@@ -114,21 +103,11 @@ export class MissionListComponent implements OnInit, OnDestroy {
   private currentUser = auth.currentUser;
 
   ngOnInit() {
-    // Requête : On cherche les jobs qui attendent des propositions ('analyzing')
     const jobsQuery = query(collection(db, 'jobs'), where('status', '==', 'analyzing'));
     
     this.unsubscribe = onSnapshot(jobsQuery, (snapshot) => {
-      console.log('[MissionList] Snapshot reçu. Docs:', snapshot.docs.length);
-      
       const fetchedJobs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Job[];
-      
       this.jobs = fetchedJobs.sort((a, b) => this.formatTimestamp(b.createdAt).getTime() - this.formatTimestamp(a.createdAt).getTime());
-      this.isLoading = false;
-      this.errorMessage = ''; // Clear error on success
-      this.cdr.detectChanges();
-    }, (error) => {
-      console.error("[MissionList] Erreur Firestore:", error);
-      this.errorMessage = error.message; // Affiche l'erreur à l'utilisateur
       this.isLoading = false;
       this.cdr.detectChanges();
     });
@@ -159,7 +138,8 @@ export class MissionListComponent implements OnInit, OnDestroy {
       await updateDoc(doc(db, 'jobs', job.id), {
         proposals: arrayUnion(proposal)
       });
-      alert("Candidature envoyée !");
+      
+      alert("Proposition envoyée au client !");
       this.offerPrice[job.id] = 0;
     } catch (e: any) {
       console.error(e);

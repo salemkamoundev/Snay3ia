@@ -17,17 +17,15 @@ export const routes: Routes = [
   { path: 'register', component: RegisterComponent, title: 'Inscription' },
   { path: 'role-select', component: RoleSelectionComponent, title: 'Snay3ia - Qui êtes-vous ?' },
   
-  // Dashboard
   {
     path: 'dashboard',
     component: DashboardComponent,
     canActivate: [authGuard],
     children: [
       { path: 'client', component: UserProfileComponent, title: 'Mon Espace Client' },
-      { path: 'worker', component: WorkerProfileComponent, title: 'Mon Espace Pro' },
-      // Nouvelle route pour les missions
+      { path: 'worker', component: WorkerProfileComponent, title: 'Mon Profil Pro' },
       { path: 'missions', component: MissionListComponent, title: 'Missions Disponibles' },
-      { path: '', redirectTo: 'client', pathMatch: 'full' }
+      // PLUS DE REDIRECTION PAR DÉFAUT ICI : C'est le DashboardComponent qui gère.
     ]
   },
 
