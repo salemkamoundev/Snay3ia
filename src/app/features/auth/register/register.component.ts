@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '../../../core/firebase.config'; // CORRECT: 3 niveaux
+import { auth } from '../../../core/firebase.config';
 
 @Component({
   selector: 'app-register',
@@ -13,50 +13,14 @@ import { auth } from '../../../core/firebase.config'; // CORRECT: 3 niveaux
 })
 export class RegisterComponent {
   private router = inject(Router);
-  
-  fullName = '';
-  email = '';
-  password = '';
-  confirmPassword = '';
-  errorMessage = '';
-  isLoading = false;
-
+  fullName = ''; email = ''; password = ''; confirmPassword = ''; errorMessage = ''; isLoading = false;
   async onRegister() {
-    if (this.password !== this.confirmPassword) {
-      this.errorMessage = 'Les mots de passe ne correspondent pas.';
-      return;
-    }
-
-    this.isLoading = true;
-    this.errorMessage = '';
-    
+    if (this.password !== this.confirmPassword) { this.errorMessage = 'Les mots de passe ne correspondent pas.'; return; }
+    this.isLoading = true; this.errorMessage = '';
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, this.email, this.password);
-      
-      if (this.fullName) {
-        await updateProfile(userCredential.user, {
-          displayName: this.fullName
-        });
-      }
-
+      if (this.fullName) await updateProfile(userCredential.user, { displayName: this.fullName });
       this.router.navigate(['/role-select']);
-    } catch (error: any) {
-      console.error('Registration error', error);
-      switch(error.code) {
-        case 'auth/email-already-in-use':
-          this.errorMessage = 'Cet email est déjà utilisé.';
-          break;
-        case 'auth/weak-password':
-          this.errorMessage = 'Le mot de passe doit contenir au moins 6 caractères.';
-          break;
-        case 'auth/invalid-email':
-          this.errorMessage = 'Adresse email invalide.';
-          break;
-        default:
-          this.errorMessage = 'Erreur lors de l\'inscription (' + error.code + ').';
-      }
-    } finally {
-      this.isLoading = false;
-    }
+    } catch (error: any) { this.errorMessage = error.code; } finally { this.isLoading = false; }
   }
 }
