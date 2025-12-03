@@ -1,0 +1,56 @@
+<div class="p-4 sm:p-6 bg-gray-50 min-h-screen">
+  <h1 class="text-3xl font-extrabold text-blue-800 mb-6 border-b-2 pb-2">Artisans Qualifiés (Snay3ia)</h1>
+
+  <!-- Barre de Recherche (Placeholder) -->
+  <div class="mb-6 bg-white p-4 rounded-xl shadow-lg">
+    <input 
+      type="text" 
+      placeholder="Rechercher par Spécialité ou Ville (Ex: Électricien, Tunis)"
+      class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+    />
+  </div>
+
+  <!-- Indicateur de Chargement -->
+  @if (isLoading) {
+    <div class="text-center p-8 text-gray-500">
+      <div class="animate-spin h-6 w-6 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+      Chargement des artisans...
+    </div>
+  }
+
+  <!-- Liste des Artisans -->
+  @if (!isLoading && artisans.length > 0) {
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      @for (artisan of artisans; track artisan.id) {
+        <div class="bg-white p-5 rounded-xl shadow-md hover:shadow-xl transition duration-300 border-l-4 border-blue-500">
+          <div class="flex items-start justify-between mb-3">
+            <h2 class="text-xl font-semibold text-gray-800">{{ artisan.name }}</h2>
+            <div class="flex items-center text-sm text-yellow-600">
+              <svg class="w-4 h-4 fill-current mr-1" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.487 7.643l6.561-.955L10 1l2.952 5.688 6.561.955-4.758 4.642 1.123 6.545z"/></svg>
+              <span>{{ artisan.rating || 'N/A' }}</span>
+            </div>
+          </div>
+          
+          <p class="text-sm text-gray-600 mb-2">
+            <span class="font-medium text-blue-600">Spécialité :</span> {{ artisan.specialty }}
+          </p>
+          <p class="text-sm text-gray-600 mb-4">
+            <span class="font-medium">Ville :</span> {{ artisan.city }}
+          </p>
+          
+          <button class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition duration-150 shadow-md">
+            Contacter
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- Aucun Artisan trouvé -->
+  @if (!isLoading && artisans.length === 0) {
+    <div class="text-center p-8 bg-white rounded-xl shadow-lg">
+      <p class="text-lg text-gray-500">Aucun artisan trouvé pour le moment.</p>
+      <p class="text-sm text-gray-400 mt-1">Veuillez vérifier vos filtres ou réessayer plus tard.</p>
+    </div>
+  }
+</div>
