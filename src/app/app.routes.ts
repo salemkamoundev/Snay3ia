@@ -5,39 +5,19 @@ import { ArtisanListComponent } from './features/pro-search/artisan-list/artisan
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { UserProfileComponent } from './features/dashboard/user-profile/user-profile.component';
 import { WorkerProfileComponent } from './features/dashboard/worker-profile/worker-profile.component';
+import { MissionListComponent } from './features/dashboard/mission-list/mission-list.component';
 import { RoleSelectionComponent } from './features/auth/role-selection/role-selection.component';
 import { LoginComponent } from './features/auth/login/login.component';
 import { RegisterComponent } from './features/auth/register/register.component';
 import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
-  // Page d'accueil publique (Landing Page)
-  { 
-    path: '', 
-    component: HomeComponent,
-    title: 'Snay3ia - Accueil'
-  },
+  { path: '', component: HomeComponent, title: 'Snay3ia - Accueil' },
+  { path: 'login', component: LoginComponent, title: 'Connexion' },
+  { path: 'register', component: RegisterComponent, title: 'Inscription' },
+  { path: 'role-select', component: RoleSelectionComponent, title: 'Snay3ia - Qui êtes-vous ?' },
   
-  // Authentification
-  {
-    path: 'login',
-    component: LoginComponent,
-    title: 'Connexion'
-  },
-  {
-    path: 'register',
-    component: RegisterComponent,
-    title: 'Inscription'
-  },
-  
-  // Sélection de rôle (après inscription ou première connexion si non défini)
-  {
-    path: 'role-select',
-    component: RoleSelectionComponent,
-    title: 'Snay3ia - Qui êtes-vous ?'
-  },
-  
-  // Routes protégées (Tableau de bord connecté)
+  // Dashboard
   {
     path: 'dashboard',
     component: DashboardComponent,
@@ -45,27 +25,13 @@ export const routes: Routes = [
     children: [
       { path: 'client', component: UserProfileComponent, title: 'Mon Espace Client' },
       { path: 'worker', component: WorkerProfileComponent, title: 'Mon Espace Pro' },
-      // Redirection intelligente
+      // Nouvelle route pour les missions
+      { path: 'missions', component: MissionListComponent, title: 'Missions Disponibles' },
       { path: '', redirectTo: 'client', pathMatch: 'full' }
     ]
   },
 
-  // Fonctionnalités spécifiques
-  { 
-    path: 'job-request', 
-    component: JobRequestComponent,
-    title: 'Nouvelle Demande'
-  },
-  
-  { 
-    path: 'pro-search', 
-    component: ArtisanListComponent,
-    title: 'Trouver un Pro'
-  },
-
-  // Fallback
-  { 
-    path: '**', 
-    redirectTo: '' 
-  }
+  { path: 'job-request', component: JobRequestComponent, title: 'Nouvelle Demande' },
+  { path: 'pro-search', component: ArtisanListComponent, title: 'Trouver un Pro' },
+  { path: '**', redirectTo: '' }
 ];

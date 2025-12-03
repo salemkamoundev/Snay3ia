@@ -5,7 +5,7 @@ import { db, auth } from '../firebase.config';
 
 interface Job {
   description: string;
-  imageUrl: string;
+  imageUrls: string[]; // Support multi-images
   status: 'pending' | 'analyzing' | 'assigned' | 'completed';
   createdAt: Date;
   userId: string;
@@ -19,65 +19,71 @@ export class Sannay3iService {
   private firestore: Firestore = db;
   private jobsCollection = collection(this.firestore, 'jobs');
 
-  // Fonction utilitaire pour générer un ID unique sans librairie externe
   private generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
 
-  async createJob(description: string, file: File): Promise<string> {
-    console.log('[Service] Début createJob...');
+  /**
+   * Upload multiple files and create job
+   */
+  async createJob(description: string, files: File[]): Promise<string> {
+    console.log('[Service] Début createJob avec', files.length, 'fichiers.');
 
-    // 1. Vérification Auth
     const user = auth.currentUser;
     if (!user) {
-      console.error('[Service] Erreur: Utilisateur non connecté');
-      throw new Error("Vous devez être connecté pour soumettre une demande.");
+      throw new Error("Vous devez être connecté.");
     }
 
     try {
-      // 2. Préparation du fichier
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.uid}/${this.generateId()}.${fileExt}`;
+      const uploadedUrls: string[] = [];
+
+      // 1. Upload de chaque fichier en parallèle avec gestion d'erreur individuelle
+      const uploadPromises = files.map(async (file) => {
+        try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${user.uid}/${this.generateId()}.${fileExt}`;
+          
+          // Upload vers Supabase
+          const { error: uploadError } = await supabase.storage
+            .from(STORAGE_BUCKET_BREAKDOWNS)
+            .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+          if (uploadError) {
+            console.error(`Erreur upload Supabase pour ${file.name}:`, uploadError);
+            throw new Error(`Échec upload de ${file.name}. Vérifiez la taille (<10Mo).`);
+          }
+
+          const { data: urlData } = supabase.storage
+            .from(STORAGE_BUCKET_BREAKDOWNS)
+            .getPublicUrl(fileName);
+            
+          return urlData.publicUrl;
+        } catch (err: any) {
+          // Si c'est une erreur de parsing JSON (le cas classique du 400 Bad Request HTML)
+          if (err.message && err.message.includes('Unexpected token')) {
+             throw new Error(`Le fichier "${file.name}" est trop volumineux pour le serveur.`);
+          }
+          throw err;
+        }
+      });
+
+      // Attendre que tous les uploads soient finis
+      const results = await Promise.all(uploadPromises);
+      uploadedUrls.push(...results);
       
-      console.log(`[Service] Upload vers Supabase : ${fileName}`);
+      console.log('[Service] URLs obtenues:', uploadedUrls);
 
-      // 3. Upload Supabase
-      const { data, error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET_BREAKDOWNS)
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('[Service] Erreur Upload Supabase:', uploadError);
-        throw new Error(`Erreur Upload: ${uploadError.message}`);
-      }
-
-      // 4. Récupération URL
-      const { data: urlData } = supabase.storage
-        .from(STORAGE_BUCKET_BREAKDOWNS)
-        .getPublicUrl(fileName);
-
-      if (!urlData.publicUrl) {
-        throw new Error("Impossible de récupérer l'URL publique.");
-      }
-      console.log('[Service] URL obtenue:', urlData.publicUrl);
-
-      // 5. Sauvegarde Firestore
+      // 2. Sauvegarde Firestore
       const newJob: Job = {
         description: description,
-        imageUrl: urlData.publicUrl,
-        status: 'analyzing', // Déclenche la Cloud Function si elle est déployée
+        imageUrls: uploadedUrls, // Tableau d'URLs
+        status: 'analyzing', // Deviendra "Validé" côté affichage
         createdAt: new Date(),
         userId: user.uid,
         userEmail: user.email || 'Anonyme'
       };
 
-      console.log('[Service] Création document Firestore...');
       const docRef = await addDoc(this.jobsCollection, newJob);
-      console.log('[Service] Succès ! ID du Job:', docRef.id);
-
       return docRef.id;
 
     } catch (error: any) {
