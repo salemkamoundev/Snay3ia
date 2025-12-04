@@ -43,6 +43,7 @@ interface Notification { id: string; message: string; createdAt: any; read: bool
           @for (job of jobs; track job.id) {
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden p-5">
                <p class="font-bold">{{ job.description }}</p>
+               <!-- Formulaire simplifié pour l'exemple -->
                <div class="mt-4">
                  <input type="number" [(ngModel)]="getForm(job.id).price" placeholder="Prix (TND)" class="w-full p-2 border rounded mb-2">
                  <textarea [(ngModel)]="getForm(job.id).description" placeholder="Message" class="w-full p-2 border rounded mb-2"></textarea>
