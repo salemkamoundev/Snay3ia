@@ -1,6 +1,17 @@
 import { Injectable } from '@angular/core';
-import { of, Observable } from 'rxjs';
-import { delay } from 'rxjs/operators';
+import { from, Observable, of } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
+import { db } from '../firebase.config';
+import { doc, getDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
+
+export interface Review {
+  author: string;
+  comment?: string;
+  audioUrl?: string;
+  rating: number; // 1 (Non satisfait) ou 5 (Satisfait)
+  isSatisfied: boolean;
+  createdAt: any;
+}
 
 export interface WorkerProfile {
   uid: string;
@@ -8,29 +19,41 @@ export interface WorkerProfile {
   specialty: string;
   rating: number;
   completedJobs: number;
-  reviews: { author: string; comment: string; rating: number }[];
+  reviews: Review[];
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class UserService {
-  // Mock Data
-  getWorkerProfile(workerId: string): Observable<WorkerProfile> {
-    const mockProfiles: WorkerProfile[] = [
-      {
-        uid: workerId,
-        displayName: 'Ahmed B.',
-        specialty: 'Électricien Expert',
-        rating: 4.8,
-        completedJobs: 142,
-        reviews: [
-          { author: 'Sami K.', comment: 'Très professionnel et rapide.', rating: 5 },
-          { author: 'Leila M.', comment: 'Bon travail, prix correct.', rating: 4 },
-          { author: 'Karim T.', comment: 'A résolu ma panne en 10min.', rating: 5 }
-        ]
-      }
-    ];
-    return of(mockProfiles[0]).pipe(delay(500));
+  
+  // Récupère les données réelles de l'artisan et ses avis
+  getWorkerProfile(workerId: string): Observable<WorkerProfile | null> {
+    const userRef = doc(db, 'users', workerId);
+    
+    return from(getDoc(userRef)).pipe(
+      switchMap(userSnap => {
+        if (!userSnap.exists()) return of(null);
+        
+        const userData = userSnap.data();
+        const reviewsRef = collection(db, 'users', workerId, 'reviews');
+        const q = query(reviewsRef, orderBy('createdAt', 'desc'));
+
+        return from(getDocs(q)).pipe(
+          map(reviewsSnap => {
+            const reviews = reviewsSnap.docs.map(d => d.data() as Review);
+            
+            return {
+              uid: workerId,
+              displayName: userData['displayName'] || 'Artisan',
+              specialty: userData['specialty'] || 'Général',
+              rating: userData['rating'] || 0, // Calculé idéalement par une Cloud Function
+              completedJobs: userData['completedJobs'] || 0,
+              reviews: reviews
+            } as WorkerProfile;
+          })
+        );
+      })
+    );
   }
 }
