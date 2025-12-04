@@ -6,7 +6,7 @@ import { UserService, WorkerProfile } from '../../../core/services/user.service'
 import { ChatComponent } from '../chat/chat.component';
 
 interface Proposal { workerId: string; workerName: string; price: number; duration: string; workerCount: number; description: string; audioUrl?: string; status: string; }
-interface Job { id: string; description: string; imageUrl?: string; imageUrls?: string[]; status: string; createdAt: any; proposals?: Proposal[]; unreadCount?: number; }
+interface Job { id: string; description: string; imageUrl?: string; imageUrls?: string[]; status: string; createdAt: any; proposals?: Proposal[]; unreadCount?: number; acceptedPrice?: number; acceptedDuration?: string; acceptedWorkerCount?: number; acceptedDescription?: string; acceptedAt?: any; }
 interface Notification { id: string; message: string; createdAt: any; read: boolean; }
 
 @Component({
@@ -56,21 +56,17 @@ interface Notification { id: string; message: string; createdAt: any; read: bool
               <div class="flex gap-4 items-start">
                 <div class="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden relative">
                   <img [src]="getMainMedia(job)" class="w-full h-full object-cover">
-                  @if (job.imageUrls && job.imageUrls.length > 1) {
-                    <div class="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] px-1 rounded-tl">+{{ job.imageUrls.length - 1 }}</div>
-                  }
                 </div>
                 <div class="flex-grow min-w-0">
                   <div class="flex justify-between items-start mb-1">
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase" [class]="getStatusClass(job.status)">{{ getStatusLabel(job.status) }}</span>
-                    <span class="text-xs text-gray-400 ml-2">{{ formatTimestamp(job.createdAt) | date:'dd MMM' }}</span>
+                    <span class="text-xs text-gray-400 ml-2">{{ formatTimestamp(job.createdAt) | date:'dd MMM HH:mm' }}</span>
                   </div>
                   <p class="text-gray-800 font-medium text-sm line-clamp-2">{{ job.description }}</p>
                   
-                  <!-- Badge Propositions -->
                   @if (job.status === 'analyzing' && job.proposals?.length) {
                     <span class="inline-block mt-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
-                      {{ job.proposals?.length }} Proposition(s) reçue(s) <!-- CORRECTION: ?.length -->
+                      {{ job.proposals?.length }} Proposition(s) reçue(s)
                     </span>
                   }
                 </div>
@@ -121,7 +117,21 @@ interface Notification { id: string; message: string; createdAt: any; read: bool
                   <p class="text-sm text-gray-800 bg-gray-50 p-3 rounded mt-1">{{ selectedJobDetails.description }}</p>
                 </div>
 
-                <!-- LISTE DES PROPOSITIONS DANS LA MODALE -->
+                <!-- INFO VALIDATION (Si assigné) -->
+                @if (selectedJobDetails.status === 'assigned') {
+                  <div class="bg-green-50 p-3 rounded-lg border border-green-200">
+                    <h4 class="text-xs font-bold text-green-700 uppercase mb-2">Devis Validé</h4>
+                    <div class="grid grid-cols-2 gap-2 text-sm mb-2">
+                       <div><span class="font-bold">Prix:</span> {{ selectedJobDetails.acceptedPrice }} TND</div>
+                       <div><span class="font-bold">Durée:</span> {{ selectedJobDetails.acceptedDuration }}</div>
+                       <div><span class="font-bold">Artisans:</span> {{ selectedJobDetails.acceptedWorkerCount }}</div>
+                    </div>
+                    <p class="text-xs italic text-green-800">{{ selectedJobDetails.acceptedDescription }}</p>
+                    <p class="text-[10px] text-right text-green-600 mt-2">Validé le {{ formatTimestamp(selectedJobDetails.acceptedAt) | date:'medium' }}</p>
+                  </div>
+                }
+
+                <!-- LISTE DES PROPOSITIONS (Si analyzing) -->
                 @if (selectedJobDetails.status === 'analyzing' && selectedJobDetails.proposals) {
                   <div>
                     <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Propositions des artisans</h4>
@@ -232,7 +242,16 @@ export class UserProfileComponent implements OnInit, OnDestroy {
   async acceptProposal(job: Job, proposal: Proposal) {
     if(!confirm('Valider cet artisan ?')) return;
     try {
-      await updateDoc(doc(db, 'jobs', job.id), { status: 'assigned', workerId: proposal.workerId, acceptedPrice: proposal.price });
+      // SAVE ALL QUOTE DETAILS
+      await updateDoc(doc(db, 'jobs', job.id), { 
+        status: 'assigned', 
+        workerId: proposal.workerId, 
+        acceptedPrice: proposal.price,
+        acceptedDuration: proposal.duration,
+        acceptedWorkerCount: proposal.workerCount,
+        acceptedDescription: proposal.description,
+        acceptedAt: new Date() 
+      });
       // Notif Artisan
       await addDoc(collection(db, 'users', proposal.workerId, 'notifications'), {
         message: 'Votre devis a été accepté !', createdAt: new Date().toISOString(), read: false

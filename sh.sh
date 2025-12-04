@@ -6,15 +6,15 @@
 # 2. Supprime les dépendances inutiles (DatePipe).
 # 3. Met à jour WorkerProfile avec Détails enrichis et Chat.
 # 4. FIX CHAT : Hauteur responsive + Réponse + Lecture automatique.
-# 5. UPDATE CLIENT : Fix TS Error (Object possibly undefined).
-# 6. UPDATE WORKER : Correction variable 's' et typage 'd'.
+# 5. UPDATE CLIENT : Enregistrement complet du devis lors de l'acceptation.
+# 6. UPDATE ALL : Affichage des dates et détails complets (Prix, Durée, Staff).
 # ==========================================
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🧹 Mise à jour complète du Dashboard Client & Artisan (Correction Compilation)...${NC}"
+echo -e "${BLUE}🧹 Mise à jour complète (Détails Devis & Dates)...${NC}"
 
 # ==========================================
 # 1. ChatComponent (Inchangé - Déjà optimisé)
@@ -147,7 +147,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 EOF
 
 # ==========================================
-# 2. MissionListComponent (UPDATE: Notifie le client lors de la candidature)
+# 2. MissionListComponent (Inchangé - Notifications Client)
 # ==========================================
 MISSION_DIR="src/app/features/dashboard/mission-list"
 MISSION_FILE="$MISSION_DIR/mission-list.component.ts"
@@ -266,10 +266,10 @@ EOF
 
 
 # ==========================================
-# 3. UserProfileComponent (UPDATE: Dashboard Client complet)
+# 3. UserProfileComponent (UPDATE: Save all Quote Details)
 # ==========================================
 UP_FILE="src/app/features/dashboard/user-profile/user-profile.component.ts"
-echo -e "  - Réparation ${UP_FILE} (Correctif TS2532)..."
+echo -e "  - Réparation ${UP_FILE} (Enregistrement complet devis)..."
 
 cat <<EOF > "$UP_FILE"
 import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef } from '@angular/core';
@@ -280,7 +280,7 @@ import { UserService, WorkerProfile } from '../../../core/services/user.service'
 import { ChatComponent } from '../chat/chat.component';
 
 interface Proposal { workerId: string; workerName: string; price: number; duration: string; workerCount: number; description: string; audioUrl?: string; status: string; }
-interface Job { id: string; description: string; imageUrl?: string; imageUrls?: string[]; status: string; createdAt: any; proposals?: Proposal[]; unreadCount?: number; }
+interface Job { id: string; description: string; imageUrl?: string; imageUrls?: string[]; status: string; createdAt: any; proposals?: Proposal[]; unreadCount?: number; acceptedPrice?: number; acceptedDuration?: string; acceptedWorkerCount?: number; acceptedDescription?: string; acceptedAt?: any; }
 interface Notification { id: string; message: string; createdAt: any; read: boolean; }
 
 @Component({
@@ -330,21 +330,17 @@ interface Notification { id: string; message: string; createdAt: any; read: bool
               <div class="flex gap-4 items-start">
                 <div class="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden relative">
                   <img [src]="getMainMedia(job)" class="w-full h-full object-cover">
-                  @if (job.imageUrls && job.imageUrls.length > 1) {
-                    <div class="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] px-1 rounded-tl">+{{ job.imageUrls.length - 1 }}</div>
-                  }
                 </div>
                 <div class="flex-grow min-w-0">
                   <div class="flex justify-between items-start mb-1">
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase" [class]="getStatusClass(job.status)">{{ getStatusLabel(job.status) }}</span>
-                    <span class="text-xs text-gray-400 ml-2">{{ formatTimestamp(job.createdAt) | date:'dd MMM' }}</span>
+                    <span class="text-xs text-gray-400 ml-2">{{ formatTimestamp(job.createdAt) | date:'dd MMM HH:mm' }}</span>
                   </div>
                   <p class="text-gray-800 font-medium text-sm line-clamp-2">{{ job.description }}</p>
                   
-                  <!-- Badge Propositions -->
                   @if (job.status === 'analyzing' && job.proposals?.length) {
                     <span class="inline-block mt-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
-                      {{ job.proposals?.length }} Proposition(s) reçue(s) <!-- CORRECTION: ?.length -->
+                      {{ job.proposals?.length }} Proposition(s) reçue(s)
                     </span>
                   }
                 </div>
@@ -395,7 +391,21 @@ interface Notification { id: string; message: string; createdAt: any; read: bool
                   <p class="text-sm text-gray-800 bg-gray-50 p-3 rounded mt-1">{{ selectedJobDetails.description }}</p>
                 </div>
 
-                <!-- LISTE DES PROPOSITIONS DANS LA MODALE -->
+                <!-- INFO VALIDATION (Si assigné) -->
+                @if (selectedJobDetails.status === 'assigned') {
+                  <div class="bg-green-50 p-3 rounded-lg border border-green-200">
+                    <h4 class="text-xs font-bold text-green-700 uppercase mb-2">Devis Validé</h4>
+                    <div class="grid grid-cols-2 gap-2 text-sm mb-2">
+                       <div><span class="font-bold">Prix:</span> {{ selectedJobDetails.acceptedPrice }} TND</div>
+                       <div><span class="font-bold">Durée:</span> {{ selectedJobDetails.acceptedDuration }}</div>
+                       <div><span class="font-bold">Artisans:</span> {{ selectedJobDetails.acceptedWorkerCount }}</div>
+                    </div>
+                    <p class="text-xs italic text-green-800">{{ selectedJobDetails.acceptedDescription }}</p>
+                    <p class="text-[10px] text-right text-green-600 mt-2">Validé le {{ formatTimestamp(selectedJobDetails.acceptedAt) | date:'medium' }}</p>
+                  </div>
+                }
+
+                <!-- LISTE DES PROPOSITIONS (Si analyzing) -->
                 @if (selectedJobDetails.status === 'analyzing' && selectedJobDetails.proposals) {
                   <div>
                     <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Propositions des artisans</h4>
@@ -506,7 +516,16 @@ export class UserProfileComponent implements OnInit, OnDestroy {
   async acceptProposal(job: Job, proposal: Proposal) {
     if(!confirm('Valider cet artisan ?')) return;
     try {
-      await updateDoc(doc(db, 'jobs', job.id), { status: 'assigned', workerId: proposal.workerId, acceptedPrice: proposal.price });
+      // SAVE ALL QUOTE DETAILS
+      await updateDoc(doc(db, 'jobs', job.id), { 
+        status: 'assigned', 
+        workerId: proposal.workerId, 
+        acceptedPrice: proposal.price,
+        acceptedDuration: proposal.duration,
+        acceptedWorkerCount: proposal.workerCount,
+        acceptedDescription: proposal.description,
+        acceptedAt: new Date() 
+      });
       // Notif Artisan
       await addDoc(collection(db, 'users', proposal.workerId, 'notifications'), {
         message: 'Votre devis a été accepté !', createdAt: new Date().toISOString(), read: false
@@ -527,7 +546,7 @@ export class UserProfileComponent implements OnInit, OnDestroy {
 EOF
 
 # ==========================================
-# 4. WorkerProfileComponent (Update: Details & Chat)
+# 4. WorkerProfileComponent (Update: Full Details Display)
 # ==========================================
 WORKER_FILE="src/app/features/dashboard/worker-profile/worker-profile.component.ts"
 echo -e "  - Correction ${WORKER_FILE}..."
@@ -538,7 +557,7 @@ import { auth, db } from '../../../core/firebase.config';
 import { collection, query, where, onSnapshot, Unsubscribe, orderBy, limit } from 'firebase/firestore';
 import { ChatComponent } from '../chat/chat.component';
 
-interface Job { id: string; description: string; imageUrl?: string; imageUrls?: string[]; status: string; createdAt: any; acceptedPrice?: number; userEmail?: string; unreadCount?: number; }
+interface Job { id: string; description: string; imageUrl?: string; imageUrls?: string[]; status: string; createdAt: any; acceptedPrice?: number; acceptedDuration?: string; acceptedWorkerCount?: number; acceptedDescription?: string; acceptedAt?: any; userEmail?: string; unreadCount?: number; }
 
 @Component({
   selector: 'app-worker-profile',
@@ -556,19 +575,26 @@ interface Job { id: string; description: string; imageUrl?: string; imageUrls?: 
            <div class="space-y-4">
              @for (job of activeJobs; track job.id) {
                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500 flex flex-col gap-2">
-                 <div class="flex justify-between">
-                   <h5 class="font-bold text-gray-800 line-clamp-1">{{ job.description }}</h5>
+                 <div class="flex justify-between items-start">
+                   <div>
+                     <h5 class="font-bold text-gray-800 line-clamp-1">{{ job.description }}</h5>
+                     <span class="text-xs text-gray-500">Demande du : {{ formatTimestamp(job.createdAt) | date:'dd/MM/yyyy' }}</span>
+                   </div>
                    @if (job.unreadCount && job.unreadCount > 0) {
                      <span class="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full animate-bounce">{{ job.unreadCount }}</span>
                    }
                  </div>
-                 <div class="flex justify-between items-end mt-1">
-                   <div class="text-xs text-gray-500"><p>Prix: {{ job.acceptedPrice }} TND</p></div>
-                   <div class="flex gap-2">
+                 
+                 <!-- INFO DEVIS EN AVANT -->
+                 <div class="bg-green-50 p-2 rounded border border-green-200 mt-2">
+                   <p class="font-bold text-green-800 text-sm">Mon Devis : {{ job.acceptedPrice }} TND</p>
+                   <p class="text-xs text-green-700">Validé le : {{ formatTimestamp(job.acceptedAt) | date:'dd/MM/yyyy' }}</p>
+                 </div>
+
+                 <div class="flex justify-end items-end mt-2 gap-2">
                      <button (click)="viewJobDetails(job)" class="bg-gray-100 text-gray-700 py-1.5 px-3 rounded-lg text-xs font-bold border border-gray-300">Détails 📋</button>
                      <button (click)="openChat(job)" class="bg-blue-50 text-blue-600 py-1.5 px-3 rounded-lg text-xs font-bold border border-blue-200">Chat 💬</button>
                      <button (click)="contactClient(job)" class="bg-green-50 text-green-700 py-1.5 px-3 rounded-lg text-xs font-bold border border-green-200">Appeler 📞</button>
-                   </div>
                  </div>
                </div>
              }
@@ -605,18 +631,33 @@ interface Job { id: string; description: string; imageUrl?: string; imageUrls?: 
 
               <div class="space-y-3">
                 <div>
-                  <label class="text-xs font-bold text-gray-500 uppercase">Description</label>
+                  <label class="text-xs font-bold text-gray-500 uppercase">Description Panne</label>
                   <p class="text-sm text-gray-800 bg-gray-50 p-3 rounded mt-1">{{ selectedJobForDetails.description }}</p>
+                </div>
+
+                <!-- DÉTAILS DU DEVIS VALIDÉ -->
+                <div class="bg-green-50 p-3 rounded-lg border border-green-200">
+                    <h4 class="text-xs font-bold text-green-700 uppercase mb-2">Détails Devis Validé</h4>
+                    <div class="grid grid-cols-2 gap-2 text-sm mb-2">
+                       <div><span class="font-bold">Prix:</span> {{ selectedJobForDetails.acceptedPrice }} TND</div>
+                       <div><span class="font-bold">Durée:</span> {{ selectedJobForDetails.acceptedDuration }}</div>
+                       <div><span class="font-bold">Artisans:</span> {{ selectedJobForDetails.acceptedWorkerCount }}</div>
+                    </div>
+                    <div class="border-t border-green-200 pt-2 mt-2">
+                        <label class="text-xs font-bold text-green-700">Message/Description Devis :</label>
+                        <p class="text-xs italic text-green-800 mt-1">{{ selectedJobForDetails.acceptedDescription }}</p>
+                    </div>
                 </div>
                 
                 <div class="flex justify-between border-t pt-3">
                   <div>
-                    <label class="text-xs font-bold text-gray-500 uppercase">Client</label>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Client Email</label>
                     <p class="text-sm font-medium">{{ selectedJobForDetails.userEmail || 'Anonyme' }}</p>
                   </div>
                   <div class="text-right">
-                    <label class="text-xs font-bold text-gray-500 uppercase">Prix Validé</label>
-                    <p class="text-lg font-bold text-green-600">{{ selectedJobForDetails.acceptedPrice }} TND</p>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Dates</label>
+                    <p class="text-xs text-gray-600">Créé le: {{ formatTimestamp(selectedJobForDetails.createdAt) | date:'dd/MM/yyyy' }}</p>
+                    <p class="text-xs text-green-600 font-bold">Validé le: {{ formatTimestamp(selectedJobForDetails.acceptedAt) | date:'dd/MM/yyyy' }}</p>
                   </div>
                 </div>
                 
@@ -650,7 +691,6 @@ export class WorkerProfileComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     const user = auth.currentUser; if (!user) return;
-    // Typage 's' explicite pour éviter TS7006, ou on laisse l'inférence qui est souvent 'QuerySnapshot'
     const q = query(collection(db, 'jobs'), where('workerId', '==', user.uid), where('status', '==', 'assigned'));
     this.unsubscribe = onSnapshot(q, (s) => {
       this.activeJobs = s.docs.map((d: any) => ({id: d.id, ...d.data()})) as Job[]; 
